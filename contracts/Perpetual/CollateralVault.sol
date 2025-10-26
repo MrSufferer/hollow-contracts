@@ -73,7 +73,8 @@ contract CollateralVault {
         require(trader != address(0), "CollateralVault: Zero address");
         require(amount > 0, "CollateralVault: Zero amount");
         
-        USDC.safeTransferFrom(trader, address(this), amount);
+        // Clearing house has already transferred USDC to this contract
+        // Just update the balance
         balances[trader] += amount;
         
         emit Deposited(trader, amount);

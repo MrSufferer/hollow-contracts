@@ -60,6 +60,15 @@ contract PerpNettingEngine is NettingEngine {
     );
 
     /**
+     * @notice Constructor - registers deferred execution for position changes
+     */
+    constructor() {
+        // Register deferred call for perpetual position changes
+        // Must match the function signature exactly
+        Runtime.defer("queuePositionChange(address,address,address,uint24,uint256,uint160,uint256,bool,bool)", 300000);
+    }
+
+    /**
      * @notice Initializes perpetual-specific components.
      * @dev Must be called after NettingEngine.init().
      * @param _positionTracker Address of the PositionTracker contract.
@@ -90,11 +99,16 @@ contract PerpNettingEngine is NettingEngine {
      * @param tokenB Second token in the pair.
      */
     function initPerpPool(address pool, address tokenA, address tokenB) external {
+        require(pool != address(0), "Invalid pool");
+        require(tokenA != address(0), "Invalid tokenA");
+        require(tokenB != address(0), "Invalid tokenB");
+        
         // Initialize pool lookup and totals tracking (direct access to internal vars)
         pools.set(pool, tokenA, tokenB);
         totalPools++;
         
-        // Register perpetual-specific request stores
+        // Register perpetual-specific request stores for BOTH tokens
+        // This ensures we can handle swaps in both directions
         _registerPerpRequestStore(pool, tokenA);
         _registerPerpRequestStore(pool, tokenB);
     }
@@ -115,6 +129,7 @@ contract PerpNettingEngine is NettingEngine {
      *  - Tokens are NOT transferred here (handled by ClearingHouse beforehand).
      *  - Actual position updates happen during deferred execution phase.
      *
+     * @param poolAddr Address of the pool (passed directly to avoid computation mismatch).
      * @param tokenIn Input token address (e.g., vUSDC for long, vETH for short).
      * @param tokenOut Output token address (e.g., vETH for long, vUSDC for short).
      * @param fee Pool fee tier (500, 3000, or 10000).
@@ -126,6 +141,7 @@ contract PerpNettingEngine is NettingEngine {
      * @return success Always returns true (output determined in deferred phase).
      */
     function queuePositionChange(
+        address poolAddr,
         address tokenIn,
         address tokenOut,
         uint24 fee,
@@ -136,22 +152,20 @@ contract PerpNettingEngine is NettingEngine {
         bool isLong
     ) external returns (bool success) {
         require(msg.sender == clearingHouse, "Only clearingHouse");
-        require(amountIn > 0, "Amount must be > 0");
 
-        // Get unique transaction ID
+        // Get unique transaction ID (same as parent)
         bytes32 pid = abi.decode(Runtime.pid(), (bytes32));
 
-        // Compute pool address and storage key
-        address poolAddr = PoolLibrary.computePoolAddr(factory, tokenIn, tokenOut, fee);
+        // Use pool address directly - no computation needed
         bytes32 keyIn = PoolLibrary.GetKey(poolAddr, tokenIn);
 
-        // Track active pool for this batch
+        // Track active pool for this batch (same as parent)
         activePools.set(abi.encodePacked(poolAddr));
 
-        // Store request using internal helper to avoid stack too deep
-        _storeRequest(keyIn, pid, tokenIn, tokenOut, fee, amountIn, sqrtPriceLimitX96, amountOut, isOpenPosition, isLong);
+        // Store request (use helper to avoid stack too deep)
+        _storePerpRequest(keyIn, pid, tokenIn, tokenOut, fee, amountIn, sqrtPriceLimitX96, amountOut, isOpenPosition, isLong);
 
-        // Update aggregated totals for netting
+        // Update aggregated totals for netting (same as parent)
         swapTotals.set(keyIn, amountIn, 0, type(uint256).max);
 
         emit PositionChangeQueued(pid, tx.origin, tokenIn, tokenOut, amountIn, isOpenPosition, isLong);
@@ -178,11 +192,11 @@ contract PerpNettingEngine is NettingEngine {
     }
 
     /**
-     * @dev Internal helper to store a request (avoids stack too deep).
+     * @dev Internal helper to store a perp request (avoids stack too deep).
      */
-    function _storeRequest(
+    function _storePerpRequest(
         bytes32 keyIn,
-        bytes32 txhash,
+        bytes32 pid,
         address tokenIn,
         address tokenOut,
         uint24 fee,
@@ -193,7 +207,7 @@ contract PerpNettingEngine is NettingEngine {
         bool isLong
     ) internal {
         perpSwapRequestBuckets[keyIn].pushPerpRequest(
-            txhash,
+            pid,
             tokenIn,
             tokenOut,
             fee,
@@ -268,5 +282,30 @@ contract PerpNettingEngine is NettingEngine {
     {
         bytes32 key = PoolLibrary.GetKey(pool, token);
         return perpSwapRequestBuckets[key];
+    }
+    
+    /**
+     * @notice Debug function to check initialization status
+     */
+    function checkInitialization() external view returns (
+        address _factory,
+        address _swapCore,
+        address _pools,
+        address _swapTotals,
+        address _activePools,
+        address _positionTracker,
+        address _clearingHouse,
+        address _perpNetting
+    ) {
+        return (
+            factory,
+            swapCore,
+            address(pools),
+            address(swapTotals),
+            address(activePools),
+            address(positionTracker),
+            clearingHouse,
+            perpNetting
+        );
     }
 }
