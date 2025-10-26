@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity =0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -29,14 +29,12 @@ contract VirtualToken is ERC20, Ownable {
      * @notice Creates a new virtual token
      * @param name Token name (e.g., "Virtual ETH")
      * @param symbol Token symbol (e.g., "vETH")
-     * @dev Mints max uint256 supply to deployer for initial pool setup
+     * @dev Does not mint initial supply - tokens minted on demand
      */
     constructor(string memory name, string memory symbol) 
         ERC20(name, symbol) 
     {
-        // Mint infinite supply to owner for initial pool liquidity
-        // This allows owner to add liquidity without minting constraints
-        _mint(msg.sender, type(uint256).max);
+        // No initial mint - virtual tokens created on demand
     }
     
     /**

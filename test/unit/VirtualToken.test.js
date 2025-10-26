@@ -25,9 +25,9 @@ describe("VirtualToken", function () {
             expect(await vToken.symbol()).to.equal("vETH");
         });
 
-        it("Should mint max supply to owner", async function () {
-            const ownerBalance = await vToken.balanceOf(owner.address);
-            expect(ownerBalance).to.equal(ethers.constants.MaxUint256);
+        it("Should have zero initial supply", async function () {
+            const totalSupply = await vToken.totalSupply();
+            expect(totalSupply).to.equal(0);
         });
 
         it("Should set the correct owner", async function () {
@@ -314,17 +314,15 @@ describe("VirtualToken", function () {
             ).to.be.revertedWith("VirtualToken: not whitelisted");
         });
 
-        it("Should handle max uint256 operations", async function () {
+        it("Should handle large mint operations", async function () {
             await vToken.addToWhitelist(whitelistedAddress.address);
             
-            // Owner already has max supply
-            const ownerBalance = await vToken.balanceOf(owner.address);
-            expect(ownerBalance).to.equal(ethers.constants.MaxUint256);
+            // Mint a large amount
+            const largeAmount = ethers.utils.parseEther("1000000000"); // 1 billion tokens
+            await vToken.connect(whitelistedAddress).mint(user1.address, largeAmount);
             
-            // Should not be able to mint more (would overflow)
-            await expect(
-                vToken.connect(whitelistedAddress).mint(owner.address, 1)
-            ).to.be.reverted; // Overflow in ERC20
+            expect(await vToken.balanceOf(user1.address)).to.equal(largeAmount);
+            expect(await vToken.totalSupply()).to.equal(largeAmount);
         });
     });
 
@@ -355,11 +353,15 @@ describe("VirtualToken", function () {
             expect(await vToken.balanceOf(user1.address)).to.equal(0);
         });
 
-        it("Should allow owner to add initial liquidity to pool", async function () {
-            // Owner has max supply for pool initialization
-            const liquidityAmount = ethers.utils.parseEther("1000000");
-            const poolAddress = user2.address; // Mock pool
+        it("Should allow owner to mint tokens for pool initialization", async function () {
+            // Owner needs to whitelist themselves first
+            await vToken.addToWhitelist(owner.address);
             
+            // Owner mints tokens for pool initialization
+            const liquidityAmount = ethers.utils.parseEther("1000000");
+            await vToken.mint(owner.address, liquidityAmount);
+            
+            const poolAddress = user2.address; // Mock pool
             await vToken.transfer(poolAddress, liquidityAmount);
             
             expect(await vToken.balanceOf(poolAddress)).to.equal(liquidityAmount);
