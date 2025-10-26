@@ -25,31 +25,31 @@ contract NettingEngine {
     using Path for bytes;
 
     /// @dev Uniswap V3 factory address
-    address private factory;
+    address internal factory;
 
     /// @dev Core contract responsible for netting & execution
-    address private swapCore;
+    address internal swapCore;
 
     /// @notice Emitted after swaps are processed and written back
     event WriteBackEvent(bytes32 indexed pid, bytes32 indexed eventSigner, bytes eventContext);
 
     /// @dev Pool registry
-    PoolLookup private pools;
+    PoolLookup internal pools;
 
     /// @dev Multiprocessor with 20 threads for running pool jobs in parallel
-    Multiprocess private mp = new Multiprocess(20);
+    Multiprocess internal mp = new Multiprocess(20);
 
     /// @dev Pending swap requests grouped by (pool, token) key
-    mapping (bytes32 => SwapRequestStore) private swapRequestBuckets;
+    mapping (bytes32 => SwapRequestStore) internal swapRequestBuckets;
 
     /// @dev Aggregated input amounts per (pool, token) key
-    HashU256Map private swapTotals;
+    HashU256Map internal swapTotals;
 
     /// @dev Number of registered pools
-    uint256 private totalPools;
+    uint256 internal totalPools;
 
     /// @dev Set of active pools in current execution batch
-    BytesOrderedSet private activePools = new BytesOrderedSet(false);
+    BytesOrderedSet internal activePools = new BytesOrderedSet(false);
 
 
     constructor() {
@@ -193,7 +193,7 @@ contract NettingEngine {
     /**
      * @dev Resets request and total tracking for a specific key.
      */
-    function _reset(bytes32 key) internal {
+    function _reset(bytes32 key) internal virtual {
         swapRequestBuckets[key].clear();
         swapTotals._resetByKey(abi.encodePacked(key));
     }

@@ -130,6 +130,13 @@ contract MockPerpSwapRequestStore {
     }
 
     /**
+     * @notice Alias for getRequestCount() for compatibility.
+     */
+    function count() public view returns (uint256) {
+        return requests.length;
+    }
+
+    /**
      * @notice Helper function to clear all requests (useful for test cleanup).
      */
     function clear() public {
